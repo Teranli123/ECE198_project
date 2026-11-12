@@ -4,13 +4,9 @@
 
 MAX30105 sensor;
 
-
-//13 is red 
-//12 is green 
-//11 is blue 
-
 //initialization for multicolored LED 
-const int heart_rate_max = 200;   // test value for max heart rate 
+int age = 18;
+const int heart_rate_max = (220 - age);   // test value for max heart rate 
 const int redpin = 13; 
 const int greenpin = 12; 
 const int bluepin = 11; 
@@ -45,9 +41,21 @@ void resetAll() {
   average = 0;
 }
 
-void set_LED_color()
-
-
+void set_LED_color(int heart_rate_max, float average) {
+  analogWrite(bluepin, 0);
+  analogWrite(greenpin, 0); 
+  analogWrite(redpin, 0);
+  if (average < 40) {
+    return;                     //no finger, LED isnt lit up
+  }
+  if (average <= (heart_rate_max*0.6) && average >= (heart_rate_max*0.4)) {
+    analogWrite(bluepin, 200);                            // 40-60% zone, medium-intensity, BLUE LIGHT 
+  }else if(average < (heart_rate_max*0.4) && average >= 40) {
+    analogWrite(greenpin, 200);                           // low-intensity zone, GREEN LIGHT 
+  }else {
+    analogWrite(redpin, 200);                             // high-intensity zone, not recommended, RED LIGHT 
+  }
+}
 
 // Called once when the 10 s warm-up is done
 void finishWarmup() {
@@ -57,7 +65,7 @@ void finishWarmup() {
     sum += warmReadings[i];
   }
   float firstAverage = sum / warmCount;
-
+  
   // 2nd pass: average again, ignoring beats far from the first average
   sum = 0;
   int n = 0;
@@ -79,7 +87,7 @@ void finishWarmup() {
 void setup() {
   Serial.begin(115200);
 
-  pinMode(redpin, OUPUT);
+  pinMode(redpin, OUTPUT);
   pinMode(greenpin, OUTPUT);
   pinMode(bluepin, OUTPUT);
 
@@ -150,6 +158,8 @@ void loop() {
       lastBeatTime = now;
     }
   }
+
+  set_LED_color(heart_rate_max, average);
 
   // 4. Print to the Serial Monitor
   if (now - lastPrintTime >= PRINT_EVERY) {
