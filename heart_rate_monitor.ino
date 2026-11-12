@@ -1,18 +1,15 @@
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h>
 #include "MAX30105.h"
 #include "heartRate.h"
 
 MAX30105 sensor;
-LiquidCrystal_I2C lcd(0x27, 16, 2);   // try 0x3F if the screen stays blank
 
 const int FINGER_LIMIT = 10000;   // IR below this = no finger
 const int GRACE = 1500;           // ms of lost contact we tolerate
 const int WARMUP_TIME = 10000;    // ms of recording before displaying
 const float ALPHA = 0.25;         // EMA speed: small = smooth, large = fast
-const int PRINT_EVERY = 10;       // print every 10th reading (wider plot)
 const int MAX_BEATS = 40;         // max beats stored during warm-up
-const int LCD_EVERY = 500;        // update the LCD every 500 ms
+const int PRINT_EVERY = 500;      // print to Serial Monitor every 500 ms
 
 float warmReadings[MAX_BEATS];    // BPM values recorded during warm-up
 int warmCount = 0;                // how many are stored
@@ -24,8 +21,7 @@ int badBeats = 0;                 // wrong beats in a row
 long lastBeatTime = 0;
 long lastFingerTime = 0;
 float average = 0;                // the smoothed BPM
-int printCounter = 0;
-long lastLCDTime = 0;
+long lastPrintTime = 0;
 
 // Start everything over (finger removed)
 void resetAll() {
@@ -65,44 +61,11 @@ void finishWarmup() {
   badBeats = 0;
 }
 
-// Write text on one LCD row, padded with spaces to erase old text
-void showLine(int row, const char* text) {
-  char buf[17];
-  snprintf(buf, sizeof(buf), "%-16s", text);
-  lcd.setCursor(0, row);
-  lcd.print(buf);
-}
-
-// Decide what the LCD should say
-void updateLCD(long now) {
-  char line[17];
-
-  if (now - lastFingerTime > GRACE) {
-    showLine(1, "Place finger");
-  }
-  else if (warmingUp) {
-    long left = (WARMUP_TIME - (now - fingerStartTime) + 999) / 1000;
-    if (left < 0) left = 0;
-    snprintf(line, sizeof(line), "Warm-up: %lds", left);
-    showLine(1, line);
-  }
-  else {
-    snprintf(line, sizeof(line), "BPM: %d", (int)(average + 0.5));
-    showLine(1, line);
-  }
-}
-
 void setup() {
   Serial.begin(115200);
 
-  lcd.init();
-  lcd.backlight();
-  showLine(0, "Heart Rate");
-  showLine(1, "Starting...");
-
   if (!sensor.begin(Wire, I2C_SPEED_FAST)) {
     Serial.println("Sensor not found. Check wiring.");
-    showLine(1, "Sensor not found");
     while (1);
   }
 
@@ -110,6 +73,7 @@ void setup() {
   sensor.setPulseAmplitudeRed(0);  // red off, IR stays on
 
   lastFingerTime = -(GRACE + 1);   // start in the "no finger" state
+  Serial.println("Place your finger on the sensor.");
 }
 
 void loop() {
@@ -168,22 +132,26 @@ void loop() {
     }
   }
 
-  // 4. Update the LCD (only twice a second so it doesn't slow the sensor)
-  if (now - lastLCDTime >= LCD_EVERY) {
-    lastLCDTime = now;
-    updateLCD(now);
-  }
+  // 4. Print to the Serial Monitor
+  if (now - lastPrintTime >= PRINT_EVERY) {
+    lastPrintTime = now;
 
-  // 5. Print for the Serial Plotter (BPM shows 0 during warm-up)
-  printCounter++;
-  if (printCounter >= PRINT_EVERY) {
-    printCounter = 0;
-
-    float shown = warmingUp ? 0 : average;
-
-    Serial.print("IR:");
-    Serial.print(ir);
-    Serial.print(",BPM:");
-    Serial.println(shown);
+    if (now - lastFingerTime > GRACE) {
+      Serial.println("No finger");
+    }
+    else if (warmingUp) {
+      long left = (WARMUP_TIME - (now - fingerStartTime) + 999) / 1000;
+      if (left < 0) left = 0;
+      Serial.print("Warm-up: ");
+      Serial.print(left);
+      Serial.println("s left");
+    }
+    else {
+      Serial.print("BPM: ");
+      Serial.print(average, 0);   // 0 decimals
+      Serial.print("   (IR: ");
+      Serial.print(ir);
+      Serial.println(")");
+    }
   }
 }
