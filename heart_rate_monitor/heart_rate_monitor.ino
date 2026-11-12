@@ -65,7 +65,7 @@ void finishWarmup() {
     sum += warmReadings[i];
   }
   float firstAverage = sum / warmCount;
-  
+
   // 2nd pass: average again, ignoring beats far from the first average
   sum = 0;
   int n = 0;
@@ -128,7 +128,7 @@ void loop() {
 
       if (lastBeatTime != 0) {
         float bpm = 60000.0 / (now - lastBeatTime);
-        bool realistic = (bpm > 40 && bpm < 180);
+        bool realistic = (bpm > 40 && bpm < 220);
 
         if (warmingUp) {
           // WARM-UP: just record believable beats, show nothing
