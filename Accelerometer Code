@@ -1,0 +1,51 @@
+const uint8_t PX = A0, PY = A1, PZ = A2;
+const uint32_t PERIOD_US = 10000; // 100 Hz sampling rate
+uint32_t nextTick;
+
+// Calibrate these zero-g counts while the sensor is flat on your desk
+float x0 = 337, y0 = 337, z0 = 337;
+const float COUNTS_PER_G = 163.7; 
+
+// EMA smoothing factor (0.0 to 1.0). Lower = smoother, Higher = faster response.
+const float ALPHA = 0.2;
+float emaX = 0, emaY = 0, emaZ = 0;
+bool firstRead = true;
+
+int readAvg(uint8_t pin) {
+  analogRead(pin); // throwaway read to let multiplexer settle
+  int sum = 0;
+  for (int i = 0; i < 4; i++) sum += analogRead(pin);
+  return sum / 4;
+}
+
+void setup() {
+  Serial.begin(115200);
+  nextTick = micros();
+}
+
+void loop() {
+  while ((int32_t)(micros() - nextTick) < 0) {}
+  nextTick += PERIOD_US;
+
+  // Raw acceleration in gs
+  float rawX = (readAvg(PX) - x0) / COUNTS_PER_G;
+  float rawY = (readAvg(PY) - y0) / COUNTS_PER_G;
+  float rawZ = (readAvg(PZ) - z0) / COUNTS_PER_G;
+
+  // Initialize EMA on the first run to prevent a zero-ramp jump
+  if (firstRead) {
+    emaX = rawX;
+    emaY = rawY;
+    emaZ = rawZ;
+    firstRead = false;
+  } else {
+    emaX = (ALPHA * rawX) + ((1.0 - ALPHA) * emaX);
+    emaY = (ALPHA * rawY) + ((1.0 - ALPHA) * emaY);
+    emaZ = (ALPHA * rawZ) + ((1.0 - ALPHA) * emaZ);
+  }
+
+  // Print smoothed values to the plotter
+  Serial.print(emaX, 3); Serial.print(',');
+  Serial.print(emaY, 3); Serial.print(',');
+  Serial.println(emaZ, 3);
+}
