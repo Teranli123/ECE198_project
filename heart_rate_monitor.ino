@@ -4,10 +4,21 @@
 
 MAX30105 sensor;
 
-const int FINGER_LIMIT = 10000;   // IR below this = no finger
-const int GRACE = 1500;           // ms of lost contact we tolerate
-const int WARMUP_TIME = 10000;    // ms of recording before displaying
-const float ALPHA = 0.25;         // EMA speed: small = smooth, large = fast
+
+//13 is red 
+//12 is green 
+//11 is blue 
+
+//initialization for multicolored LED 
+const int heart_rate_max = 200;   // test value for max heart rate 
+const int redpin = 13; 
+const int greenpin = 12; 
+const int bluepin = 11; 
+
+const int FINGER_LIMIT = 10000;   // IR limit, value below this means that there is no finger detected
+const int GRACE = 1500;           // 1500 ms of time we tolerate your finger/body loosing connection with the sensor for
+const int WARMUP_TIME = 10000;    // ms of recording before displaying, smoothen out first displayed values
+const float ALPHA = 0.25;         // EMA (exponential moving average) adjustment factor
 const int MAX_BEATS = 40;         // max beats stored during warm-up
 const int PRINT_EVERY = 500;      // print to Serial Monitor every 500 ms
 
@@ -33,6 +44,10 @@ void resetAll() {
   lastBeatTime = 0;
   average = 0;
 }
+
+void set_LED_color()
+
+
 
 // Called once when the 10 s warm-up is done
 void finishWarmup() {
@@ -63,6 +78,10 @@ void finishWarmup() {
 
 void setup() {
   Serial.begin(115200);
+
+  pinMode(redpin, OUPUT);
+  pinMode(greenpin, OUTPUT);
+  pinMode(bluepin, OUTPUT);
 
   if (!sensor.begin(Wire, I2C_SPEED_FAST)) {
     Serial.println("Sensor not found. Check wiring.");
