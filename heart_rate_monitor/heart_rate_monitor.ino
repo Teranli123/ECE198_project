@@ -30,23 +30,36 @@ const int WARMUP_TIME = 10000;    // ms of recording before displaying
 const float ALPHA = 0.25;         // heart rate EMA factor
 const int MAX_BEATS = 40;         // max beats stored during warm-up
 
+//general vars
+
 float warmReadings[MAX_BEATS];
 int warmCount = 0;
 bool warmingUp = true;
 long fingerStartTime = 0;
 
-int count = 0;
+int rep_count = 0;
+int confidence_count = 0;
 int badBeats = 0;
 long lastBeatTime = 0;
 long lastFingerTime = 0;
 float average = 0;
+
+unsigned int exercise_mode{0}; // 0 for squats,
+
+// Squat rep counter. Tune the thresholds from the Serial Plotter:
+// standing should sit below SQUAT_LOWER, the bottom of a squat above SQUAT_UPPER.
+const float SQUAT_UPPER = 0.65;   // g, signal rises above this = at the bottom
+const float SQUAT_LOWER = 0.35;   // g, signal falls below this = back standing
+const long MIN_REP_MS = 800;      // ignore "reps" faster than this (bumps, jitter)
+bool squatDown = false;
+long lastRepTime = 0;
 
 // Start everything over (finger removed)
 void resetAll() {
   warmingUp = true;
   warmCount = 0;
   fingerStartTime = 0;
-  count = 0;
+  confidence_count = 0;
   badBeats = 0;
   lastBeatTime = 0;
   average = 0;
@@ -88,7 +101,7 @@ void finishWarmup() {
   else average = firstAverage;
 
   warmingUp = false;
-  count = 3;
+  confidence_count = 3;
   badBeats = 0;
 }
 
@@ -97,6 +110,14 @@ int readAvg(uint8_t pin) {
   int sum = 0;
   for (int i = 0; i < 4; i++) sum += analogRead(pin);
   return sum / 4;
+}
+
+//to reduce chatter
+
+bool hysteresis(bool state, float reading, float uthreshold, float lthreshold){ 
+  if(state && (reading < lthreshold)){return false;}
+  else if(!state && (reading > uthreshold)){return true;}
+  return state; // stay in the middle
 }
 
 void setup() {
@@ -150,16 +171,16 @@ void loop() {
           }
         }
         else {
-          bool closeToAverage = (count < 3 || fabs(bpm - average) < 20);
+          bool closeToAverage = (confidence_count < 3 || fabs(bpm - average) < 20);
 
           if (realistic && closeToAverage) {
             badBeats = 0;
             average = average + ALPHA * (bpm - average);
-            if (count < 3) count++;
+            if (confidence_count < 3) confidence_count++;
           } else {
             badBeats++;
             if (badBeats >= 3) {
-              count = 0;
+              confidence_count = 0;
               badBeats = 0;
             }
           }
@@ -186,6 +207,23 @@ void loop() {
     emaZ = (ALPHA2 * rawZ) + ((1.0 - ALPHA2) * emaZ);
   }
 
+
+  //rep couter logic
+
+  if(exercise_mode == 0){
+    bool wasDown = squatDown;
+    squatDown = hysteresis(squatDown, emaZ, SQUAT_UPPER, SQUAT_LOWER);
+
+    // detect down to up is one full rep
+    if(wasDown && !squatDown && now - lastRepTime > MIN_REP_MS){
+      rep_count++;
+      lastRepTime = now;
+    }
+  }
+  else if(exercise_mode == 1){
+    //code for rep counter of other exercises
+  }
+
   // ---------- LED ----------
   set_LED_color(heart_rate_max, average);
 
@@ -197,5 +235,7 @@ void loop() {
   Serial.print(",Z:");
   Serial.print(emaZ, 3);
   Serial.print(",BPM_div_100:");
-  Serial.println(average / 100, 3);
+  Serial.print(average / 100, 3);
+  Serial.print(",Reps:");
+  Serial.println(rep_count);
 }
