@@ -3,560 +3,555 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PT Aid Dashboard</title>
+<title>Rehab Session Overview</title>
 <style>
   :root {
-    --bg: #f4f6f8; --card: #ffffff; --text: #17202a; --muted: #5d6b7a; --line: #e1e6eb;
+    --bg: #f3f5f7; --card: #ffffff; --text: #17202a; --muted: #5d6b7a; --line: #e1e6eb;
     --accent: #2563eb; --accent-soft: #e0e9fd;
-    --zone-low: #16a34a; --zone-mid: #2563eb; --zone-high: #dc2626; --zone-off: #9aa5b1;
-    --x: #e4572e; --y: #17a398; --z: #7b5cd6;
+    --low: #16a34a; --mid: #2563eb; --high: #dc2626; --high-bg: #fde2e2; --off: #9aa5b1;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #0f141a; --card: #18202a; --text: #e8edf2; --muted: #93a1b0; --line: #2a3541;
       --accent: #5b8def; --accent-soft: #1e2c47;
-      --zone-low: #22c55e; --zone-mid: #5b8def; --zone-high: #f05252; --zone-off: #5d6b7a;
-      --x: #ff7a50; --y: #2dd4bf; --z: #a78bfa;
+      --low: #22c55e; --mid: #5b8def; --high: #f05252; --high-bg: #4a1d1f; --off: #5d6b7a;
     }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text);
-    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
-    padding: 16px 24px; border-bottom: 1px solid var(--line); background: var(--card); }
+    font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+  header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between;
+    padding: 14px 24px; background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
   header h1 { margin: 0; font-size: 20px; }
-  header .sub { color: var(--muted); font-size: 13px; }
-  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
-    background: var(--accent-soft); font-size: 13px; font-weight: 600; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--zone-off); }
-  .dot.live { background: var(--zone-low); box-shadow: 0 0 0 3px color-mix(in srgb, var(--zone-low) 25%, transparent); }
-  button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text);
-    padding: 8px 14px; border-radius: 10px; cursor: pointer; font-weight: 600; }
-  button:hover:not(:disabled) { border-color: var(--accent); }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  main { max-width: 1200px; margin: 0 auto; padding: 20px 24px 40px; display: grid; gap: 16px;
-    grid-template-columns: repeat(12, 1fr); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; min-width: 0; }
-  .card h2 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-  .span4 { grid-column: span 4; } .span8 { grid-column: span 8; } .span12 { grid-column: span 12; }
-  @media (max-width: 900px) { .span4, .span8 { grid-column: span 12; } main { padding: 16px; } header { padding: 14px 16px; } }
+  .stats { display: flex; gap: 16px; color: var(--muted); font-size: 14px; flex-wrap: wrap; }
+  .stats b { color: var(--text); }
+  .stats .alert b { color: var(--high); }
 
-  /* Reps */
-  .reps-wrap { display: flex; align-items: center; gap: 20px; }
-  .ring { position: relative; width: 150px; height: 150px; flex: none; }
-  .ring svg { transform: rotate(-90deg); }
-  .ring .num { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
-  .ring .num b { font-size: 52px; line-height: 1; font-variant-numeric: tabular-nums; }
-  .ring .num span { display: block; font-size: 13px; color: var(--muted); }
-  .bump { animation: bump .35s ease; }
-  @keyframes bump { 40% { transform: scale(1.15); } }
-  .stepper { display: flex; align-items: center; gap: 6px; }
-  .stepper button { padding: 4px 10px; }
-  .stepper output { min-width: 28px; text-align: center; font-weight: 700; }
-  .meta { color: var(--muted); font-size: 13px; }
+  .controls { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+  .controls .label { font-size: 13px; color: var(--muted); font-weight: 600; }
+  .seg { display: inline-flex; gap: 4px; background: var(--bg); padding: 4px; border-radius: 12px; }
+  .seg button { font: inherit; font-weight: 600; border: none; background: transparent; color: var(--text);
+    padding: 8px 16px; border-radius: 9px; cursor: pointer; }
+  .seg.small button { padding: 8px 12px; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+  .seg button:hover:not([aria-pressed="true"]) { background: var(--accent-soft); }
+  .btn { font: inherit; font-weight: 600; padding: 9px 14px; border-radius: 10px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--card); color: var(--text); display: inline-flex; align-items: center; gap: 6px; }
+  .btn:hover { border-color: var(--accent); }
 
-  /* Heart rate */
-  .hr { display: flex; align-items: baseline; gap: 8px; }
-  .hr b { font-size: 48px; line-height: 1.05; font-variant-numeric: tabular-nums; }
-  .zone { display: inline-block; margin-top: 6px; padding: 3px 10px; border-radius: 999px; color: #fff;
-    font-size: 13px; font-weight: 700; background: var(--zone-off); }
-  .zonebar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 14px 0 4px; position: relative; }
-  .zonebar div { height: 100%; }
-  .zonebar .marker { position: absolute; top: -4px; width: 3px; height: 16px; background: var(--text); border-radius: 2px;
-    transition: left .4s; }
-  .zonelabels { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
-  .heart { color: var(--zone-high); font-size: 22px; }
-  .heart.beat { animation: beat .25s ease; }
-  @keyframes beat { 50% { transform: scale(1.3); } }
+  main { padding: 18px 24px 28px; }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
 
-  /* Exercise */
-  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--bg); padding: 4px; border-radius: 12px; }
-  .seg button { border: none; background: transparent; padding: 10px; }
-  .seg button[aria-pressed="true"] { background: var(--card); box-shadow: 0 1px 3px rgba(0,0,0,.12); color: var(--accent); }
-  .stack { display: grid; gap: 10px; margin-top: 12px; }
-  .stack .row button { flex: 1; }
-  label.field { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
-  input[type=number] { width: 70px; font: inherit; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line);
-    background: var(--bg); color: var(--text); }
+  .tile { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 12px 14px 12px; overflow: hidden; transition: background .3s, border-color .3s, opacity .3s; }
+  .tile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--zc, var(--off)); }
+  .tile .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+  .tile .who { min-width: 0; }
+  .tile .name { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .tile .ex { font-size: 12px; color: var(--muted); }
+  .edit { flex: none; border: none; background: transparent; color: var(--muted); cursor: pointer; padding: 4px; border-radius: 6px; line-height: 0; }
+  .edit:hover { background: var(--bg); color: var(--text); }
+  .hr { display: flex; align-items: baseline; gap: 6px; margin: 4px 0 2px; }
+  .hr .heart { color: var(--zc, var(--off)); font-size: 18px; }
+  .hr b { font-size: 34px; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--zc, var(--text)); }
+  .hr span { color: var(--muted); font-size: 13px; }
+  .meter { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--zc, var(--off)); border-radius: 3px; transition: width .5s, background .3s; }
+  .foot { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .foot .reps b { color: var(--text); font-size: 16px; font-variant-numeric: tabular-nums; }
+  .weight { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--text); font-weight: 700; font-size: 12px; white-space: nowrap; }
+  .weight.bw { background: var(--bg); color: var(--muted); font-weight: 600; }
+  .weight svg { flex: none; }
 
-  /* Chart */
-  .chart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .legend { display: flex; gap: 14px; font-size: 13px; color: var(--muted); }
-  .legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
-  canvas { width: 100%; height: 220px; display: block; }
-  .readout { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
+  /* Heart rate too high: red tile that shakes */
+  .tile.high { background: var(--high-bg); border-color: var(--high); animation: shake 2s infinite; }
+  .tile.high .hr b { color: var(--high); }
+  @keyframes shake {
+    0%, 30%, 100% { transform: translateX(0); }
+    3%, 9%, 15%, 21% { transform: translateX(-4px) rotate(-.6deg); }
+    6%, 12%, 18%, 24% { transform: translateX(4px) rotate(.6deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tile.high { animation: none; box-shadow: 0 0 0 3px var(--high); }
+  }
+  /* Stopped transmitting: greyed out */
+  .tile.offline { opacity: .45; filter: grayscale(1); }
+  .tile .status { display: none; font-size: 12px; font-weight: 700; }
+  .tile.offline .status, .tile.high .status { display: inline; }
+  .tile.offline .status { color: var(--muted); }
+  .tile.high .status { color: var(--high); }
+  .tile.offline .weight, .tile.high .weight { display: none; }
 
-  /* Table */
-  .tablewrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-  td.num { font-variant-numeric: tabular-nums; }
-  .empty { color: var(--muted); text-align: center; padding: 24px; white-space: normal; }
-  .summary { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 12px; }
-  .summary div b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
-  .summary div span { font-size: 12px; color: var(--muted); }
+  dialog { border: 1px solid var(--line); border-radius: 16px; padding: 20px; background: var(--card); color: var(--text); width: min(360px, 92vw); }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  dialog h2 { margin: 0 0 14px; font-size: 18px; }
+  dialog label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+  dialog input { display: block; width: 100%; margin-top: 4px; font: inherit; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  dialog .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  dialog .hint { font-size: 12px; color: var(--muted); margin: -6px 0 14px; }
+  dialog .btns { display: flex; justify-content: flex-end; gap: 8px; }
+  dialog button { font: inherit; font-weight: 600; padding: 8px 14px; border-radius: 10px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  dialog button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-  .sim { border-style: dashed; }
-  .sim .row button { font-size: 13px; padding: 6px 10px; }
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%) translateY(80px); background: var(--text); color: var(--card);
+    padding: 10px 16px; border-radius: 10px; font-weight: 600; font-size: 14px; opacity: 0; transition: transform .25s, opacity .25s; pointer-events: none; }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  .demo-note { color: var(--muted); font-size: 12px; margin-top: 16px; }
+  .empty { grid-column: 1 / -1; color: var(--muted); text-align: center; padding: 60px 16px; margin: 0; }
+
+  @media (max-width: 600px) {
+    header, main { padding-left: 16px; padding-right: 16px; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+    .hr b { font-size: 28px; }
+    .foot { flex-wrap: wrap; }
+  }
 </style>
+<script src="vendor/exceljs.min.js"></script>
 </head>
 <body>
 <header>
   <div>
-    <h1>PT Aid Dashboard</h1>
-    <div class="sub">Physical therapy rep counter and heart rate monitor</div>
+    <h1>Rehab Session</h1>
+    <div class="stats">
+      <span><b id="sTotal">0</b> patients</span>
+      <span class="alert"><b id="sHigh">0</b> high heart rate</span>
+      <span><b id="sOff">0</b> no signal</span>
+    </div>
   </div>
-  <div class="row">
-    <span class="pill"><span id="connDot" class="dot"></span><span id="connText">Not connected</span></span>
-    <button id="btnConnect" disabled title="The real device connection will be added once the WiFi shield arrives">Connect device</button>
+  <div class="controls">
+    <span class="label">Exercise for everyone</span>
+    <div class="seg" id="exerciseSeg" role="group" aria-label="Exercise for everyone"></div>
+    <div class="seg small" id="unitSeg" role="group" aria-label="Weight unit">
+      <button data-u="lb">lb</button><button data-u="kg">kg</button>
+    </div>
+    <button class="btn" id="btnExport" title="Download this session as an Excel file">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+      Export to Excel
+    </button>
   </div>
 </header>
 
 <main>
-  <!-- Reps -->
-  <section class="card span4">
-    <h2>Reps this set</h2>
-    <div class="reps-wrap">
-      <div class="ring">
-        <svg width="150" height="150" viewBox="0 0 150 150">
-          <circle cx="75" cy="75" r="64" fill="none" stroke="var(--line)" stroke-width="12"/>
-          <circle id="ringArc" cx="75" cy="75" r="64" fill="none" stroke="var(--accent)" stroke-width="12"
-                  stroke-linecap="round" stroke-dasharray="402.1" stroke-dashoffset="402.1" style="transition: stroke-dashoffset .3s, stroke .3s"/>
-        </svg>
-        <div class="num"><div><b id="repNum">0</b><span id="repOf">of 10</span></div></div>
-      </div>
-      <div class="stack" style="margin:0">
-        <div class="meta">Target reps</div>
-        <div class="stepper">
-          <button id="tMinus" aria-label="Decrease target">−</button>
-          <output id="targetOut">10</output>
-          <button id="tPlus" aria-label="Increase target">+</button>
-        </div>
-        <div class="meta" id="setTimer">Set time 0:00</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Heart rate -->
-  <section class="card span4">
-    <h2>Heart rate</h2>
-    <div class="hr"><span id="heart" class="heart">♥</span><b id="bpmNum">--</b><span class="meta">bpm</span></div>
-    <span id="zoneTag" class="zone">Place finger on sensor (10 s to measure)</span>
-    <div class="zonebar" id="zonebar">
-      <div style="flex:40; background: var(--zone-low)"></div>
-      <div style="flex:20; background: var(--zone-mid)"></div>
-      <div style="flex:40; background: var(--zone-high)"></div>
-      <span class="marker" id="zoneMarker" style="left:0; display:none"></span>
-    </div>
-    <div class="zonelabels"><span>Light</span><span id="z40">81</span><span id="z60">121</span><span id="zMax">202 max</span></div>
-  </section>
-
-  <!-- Exercise controls -->
-  <section class="card span4">
-    <h2>Exercise</h2>
-    <div class="seg" role="group" aria-label="Exercise type">
-      <button data-mode="0" aria-pressed="true">Squats</button>
-      <button data-mode="1" aria-pressed="false">Bicep curls</button>
-    </div>
-    <div class="stack">
-      <div class="row">
-        <button id="btnReset">Reset reps</button>
-        <button id="btnFinish" class="primary">Finish set</button>
-      </div>
-      <label class="field">Age (sets heart rate zones) <input type="number" id="age" min="5" max="100" value="18"></label>
-    </div>
-  </section>
-
-  <!-- Motion chart -->
-  <section class="card span8">
-    <div class="chart-head">
-      <h2 style="margin:0">Live motion (accelerometer, g)</h2>
-      <div class="legend">
-        <span><i style="background:var(--x)"></i>X</span>
-        <span><i style="background:var(--y)"></i>Y</span>
-        <span><i style="background:var(--z)"></i>Z</span>
-      </div>
-    </div>
-    <canvas id="motion" height="220" style="margin-top:10px"></canvas>
-    <div class="readout" id="axisReadout">X 0.00 · Y 0.00 · Z 0.00</div>
-  </section>
-
-  <!-- HR trend -->
-  <section class="card span4">
-    <h2>Heart rate trend (last 2 min)</h2>
-    <canvas id="hrTrend" height="220"></canvas>
-  </section>
-
-  <!-- Session log -->
-  <section class="card span12">
-    <div class="chart-head">
-      <h2 style="margin:0">Session log</h2>
-      <div class="row">
-        <button id="btnExport">Export CSV</button>
-        <button id="btnClear">Clear log</button>
-      </div>
-    </div>
-    <div class="summary" style="margin-top:12px">
-      <div><b id="sumSets">0</b><span>Sets</span></div>
-      <div><b id="sumReps">0</b><span>Total reps</span></div>
-      <div><b id="sumTime">0:00</b><span>Session time</span></div>
-    </div>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th>#</th><th>Exercise</th><th>Reps</th><th>Target</th><th>Duration</th><th>Avg bpm</th><th>Peak bpm</th><th>Finished</th></tr></thead>
-        <tbody id="logBody"><tr><td colspan="8" class="empty">No sets yet. Press “Finish set” to log one.</td></tr></tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- Simulator -->
-  <section class="card span12 sim">
-    <h2>Simulated device</h2>
-    <p class="meta" style="margin:0 0 10px">Until the WiFi shield arrives, this page runs on fake sensor data shaped like the real Arduino output. Use these to try the UI.</p>
-    <div class="row">
-      <button id="simRun">Pause simulation</button>
-      <button id="simFinger">Remove finger</button>
-      <button id="simRest">Rest (stop moving)</button>
-    </div>
-  </section>
+  <div class="grid" id="grid"></div>
+  <div class="demo-note" id="demoNote">Showing demo data. Run server/pt_server.py and open http://localhost:8000 for live devices.</div>
 </main>
 
+<dialog id="editDlg">
+  <form method="dialog" id="editForm">
+    <h2>Edit patient</h2>
+    <label>Name <input id="fName" required maxlength="40"></label>
+    <label>Age <input id="fAge" type="number" min="5" max="110" required></label>
+    <p class="hint">Age sets the heart rate limits (max = 220 − age).</p>
+    <div class="pair">
+      <label>Squat weight (<span class="uName">lb</span>) <input id="fW0" type="number" min="0" max="1000" step="0.5" required></label>
+      <label>Curl weight (<span class="uName">lb</span>) <input id="fW1" type="number" min="0" max="1000" step="0.5" required></label>
+    </div>
+    <p class="hint">Enter 0 for a body weight exercise.</p>
+    <div class="btns">
+      <button type="button" id="fCancel">Cancel</button>
+      <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
 <script>
-/* =====================================================================
-   DEVICE INTERFACE
-   Everything the UI knows about the device goes through `Device`.
-   A data source (the simulator now, the WiFi link later) only needs to:
-     - call Device.receiveLine("X:0.12,Y:0.03,Z:0.98,BPM_div_100:0.72,Reps:3")
-       (the exact line heart_rate_monitor.ino already prints), or
-       Device.receive({x, y, z, bpm, reps})
-     - implement send(cmd) for commands from the page:
-         "R"  reset reps     "M0" squats     "M1" bicep curls
-   To plug in the real connection: write an object with start(), stop()
-   and send(cmd), then call Device.useSource(thatObject).
-   ===================================================================== */
-const Device = {
-  source: null,
-  listeners: [],
-  lastSampleAt: 0,
-  useSource(src) { if (this.source) this.source.stop(); this.source = src; src.start(this); },
-  send(cmd) { if (this.source) this.source.send(cmd); },
-  onSample(fn) { this.listeners.push(fn); },
-  receive(sample) { this.lastSampleAt = performance.now(); this.listeners.forEach(fn => fn(sample)); },
-  receiveLine(line) {
-    const s = {};
-    for (const part of line.trim().split(',')) {
-      const [k, v] = part.split(':');
-      const n = parseFloat(v);
-      if (Number.isNaN(n)) continue;
-      switch (k.trim()) {
-        case 'X': s.x = n; break;
-        case 'Y': s.y = n; break;
-        case 'Z': s.z = n; break;
-        case 'BPM_div_100': s.bpm = n * 100; break;
-        case 'BPM': s.bpm = n; break;
-        case 'Reps': s.reps = Math.round(n); break;
-        case 'Mode': s.mode = Math.round(n); break;
-      }
-    }
-    if ('x' in s || 'reps' in s) this.receive(s);
-  }
+/* ---------------------------------------------------------------------
+   Settings
+   --------------------------------------------------------------------- */
+const EXERCISES = ['Squats', 'Bicep curls'];   // index = exercise_mode on the Arduino
+const CONFIG = {
+  NO_SIGNAL_MS: 3000,    // grey a tile out after this long with no data
+  SET_REST_MS: 20000,    // a set ends after this long with no new reps (or when the exercise changes)
 };
+// Heart rate zones match set_LED_color() in heart_rate_monitor.ino:
+// below 40% of max = green, 40-60% = blue, above 60% = red (tile turns red and shakes).
+const ZONE_MID = 0.4, ZONE_HIGH = 0.6;
+const LB_PER_KG = 2.20462;
 
-/* =====================================================================
-   SIMULATED DEVICE
-   Mimics heart_rate_monitor.ino: prints the same line format at ~50 Hz,
-   counts reps itself, and obeys the same commands.
-   ===================================================================== */
-const Simulator = {
-  timer: null, t: 0, reps: 0, mode: 0, finger: true, resting: false,
-  fingerOnAt: 0, bpm: 0, hrBase: 74, effort: 0, phase: 0, counted: false,
-  start(device) {
-    this.device = device; this.fingerOnAt = this.t;
-    this.timer = setInterval(() => this.tick(), 20);
-  },
-  stop() { clearInterval(this.timer); this.timer = null; },
-  send(cmd) {
-    if (cmd === 'R') this.reps = 0;
-    else if (cmd[0] === 'M') { this.mode = parseInt(cmd.slice(1), 10) || 0; this.reps = 0; this.phase = 0; }
-  },
-  noise(a) { return (Math.random() - 0.5) * a; },
-  tick() {
-    const dt = 0.02; this.t += dt;
-    let x, y, z;
-    const moving = !this.resting;
-    if (moving) {
-      const period = this.mode === 0 ? 3.2 : 2.6;
-      const prev = this.phase;
-      this.phase = (this.phase + dt / period) % 1;
-      if (this.phase < prev) this.counted = false;
-      // 0..1..0 over a rep, with a short pause at the start
-      const p = this.phase < 0.15 ? 0 : Math.sin(((this.phase - 0.15) / 0.85) * Math.PI);
-      if (!this.counted && this.phase > 0.92) { this.reps++; this.counted = true; }
-      if (this.mode === 0) {          // squat: Z rises toward ~0.9 g at the bottom
-        x = 0.05 + 0.15 * p; y = 0.02; z = 0.2 + 0.7 * p;
-      } else {                        // bicep curl: gravity rotates from -X toward +X through Z
-        const th = p * Math.PI * 0.85;
-        x = -Math.cos(th); y = 0.05; z = Math.sin(th);
-      }
-      this.effort = Math.min(1, this.effort + dt / 60);
-    } else {
-      x = this.mode === 0 ? 0.05 : -1; y = 0.02; z = this.mode === 0 ? 0.2 : 0;
-      this.effort = Math.max(0, this.effort - dt / 40);
-    }
-    x += this.noise(0.04); y += this.noise(0.04); z += this.noise(0.04);
-
-    // Heart rate, with the same 10 s warm-up as the real sketch
-    let avg = 0;
-    if (this.finger && this.t - this.fingerOnAt >= 10) {
-      const target = this.hrBase + this.effort * 55;
-      this.bpm = this.bpm ? this.bpm + (target - this.bpm) * 0.01 + this.noise(0.3) : target;
-      avg = this.bpm;
-    }
-    if (!this.finger) this.bpm = 0;
-
-    const line = `X:${x.toFixed(3)},Y:${y.toFixed(3)},Z:${z.toFixed(3)},BPM_div_100:${(avg / 100).toFixed(3)},Reps:${this.reps}`;
-    this.device.receiveLine(line);
-  }
-};
-
-/* =====================================================================
-   UI
-   ===================================================================== */
-const $ = id => document.getElementById(id);
-const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+/* ---------------------------------------------------------------------
+   Patients and incoming data
+   Live mode (page opened from server/pt_server.py): the page polls
+   /api/state twice a second and each ESP32 shows up as a tile.
+   Demo mode (page opened as a file, or with ?demo in the URL): fake patients.
+   --------------------------------------------------------------------- */
 const store = {
   get(k, d) { try { const v = localStorage.getItem('ptaid.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem('ptaid.' + k, JSON.stringify(v)); } catch {} }
 };
-const fmtTime = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-const MODES = ['Squats', 'Bicep curls'];
 
-const state = {
-  mode: 0, reps: 0, target: store.get('target', 10), age: store.get('age', 18),
-  bpm: 0, setStart: Date.now(), sessionStart: Date.now(), setBpms: [],
-  log: store.get('log', []), motion: [], hrHist: []
+// Weights are kept as { v: number, u: 'lb' | 'kg' } so a value never drifts from converting back and forth.
+const toUnit = (w, u) => w.u === u ? w.v : (u === 'lb' ? w.v * LB_PER_KG : w.v / LB_PER_KG);
+const fmtNum = n => (Math.round(n * 2) / 2).toString();      // nearest 0.5
+const fmtWeight = (w, u) => !w || w.v <= 0 ? 'Body weight' : `${fmtNum(toUnit(w, u))} ${u}`;
+
+const Patients = {
+  list: [],
+  exercise: store.get('exercise', 0),
+  unit: store.get('unit', 'lb'),
+  sessionStart: new Date(),
+  onExerciseChange: mode => {},          // TODO: send "M<mode>" to every device once the link exists
+  add(id, name, age, weights) {
+    const saved = store.get('patient.' + id, null);
+    this.list.push({
+      id, name: saved?.name ?? name, age: saved?.age ?? age,
+      weights: saved?.weights ?? weights ?? [{ v: 0, u: 'lb' }, { v: 0, u: 'lb' }],
+      bpm: 0, reps: 0, lastSeen: 0,
+      // session stats
+      sets: [],                 // { ex, reps, weight }
+      cur: null,                // open set: { ex, startReps, lastRepAt }
+      hrSum: 0, hrN: 0, hrPeak: 0, redCount: 0, wasHigh: false
+    });
+  },
+  get(id) { return this.list.find(p => p.id === id); },
+  // sample: { bpm, reps, seq? }; seenAt: when the device last sent data (ms since epoch)
+  receive(id, sample, seenAt = Date.now()) {
+    const p = this.get(id); if (!p) return;
+    p.lastSeen = Math.max(p.lastSeen, seenAt);
+    if (sample.seq !== undefined) {                              // live: skip polls with nothing new
+      if (sample.seq === p.seq) return;
+      p.seq = sample.seq;
+    }
+    const now = Date.now();
+    if (typeof sample.bpm === 'number') p.bpm = sample.bpm;
+    if (typeof sample.reps === 'number') this.trackReps(p, sample.reps, now);
+    if (p.bpm >= 40) {
+      p.hrSum += p.bpm; p.hrN++; p.hrPeak = Math.max(p.hrPeak, p.bpm);
+      const high = zone(p) === 'high';
+      if (high && !p.wasHigh) p.redCount++;
+      p.wasHigh = high;
+    }
+  },
+  trackReps(p, reps, now) {
+    if (reps < p.reps) { this.closeSet(p); }                       // device counter was reset
+    else if (reps > p.reps) {
+      if (!p.cur) p.cur = { ex: this.exercise, startReps: p.reps };
+      p.cur.lastRepAt = now;
+    }
+    p.reps = reps;
+  },
+  closeSet(p) {
+    if (!p.cur) return;
+    const n = p.reps - p.cur.startReps;
+    if (n > 0) p.sets.push({ ex: p.cur.ex, reps: n, weight: { ...p.weights[p.cur.ex] } });
+    p.cur = null;
+  },
+  closeRestedSets(now) {
+    for (const p of this.list) if (p.cur && now - p.cur.lastRepAt > CONFIG.SET_REST_MS) this.closeSet(p);
+  },
+  currentSetReps(p) { return p.cur ? p.reps - p.cur.startReps : 0; },
+  save(p) { store.set('patient.' + p.id, { name: p.name, age: p.age, weights: p.weights }); }
 };
 
-// ---- Reps ----
-function renderReps() {
-  $('repNum').textContent = state.reps;
-  $('repOf').textContent = `of ${state.target}`;
-  $('targetOut').textContent = state.target;
-  const frac = Math.min(1, state.reps / state.target);
-  const arc = $('ringArc');
-  arc.style.strokeDashoffset = 402.1 * (1 - frac);
-  arc.style.stroke = frac >= 1 ? 'var(--zone-low)' : 'var(--accent)';
-}
-$('tMinus').onclick = () => { state.target = Math.max(1, state.target - 1); store.set('target', state.target); renderReps(); };
-$('tPlus').onclick = () => { state.target = Math.min(99, state.target + 1); store.set('target', state.target); renderReps(); };
+/* ---------------------------------------------------------------------
+   UI
+   --------------------------------------------------------------------- */
+const $ = id => document.getElementById(id);
+const PENCIL = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+const DUMBBELL = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 7v10M3 9.5v5M18 7v10M21 9.5v5M6 12h12"/></svg>';
+const PERSON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="2.2"/><path d="M12 8v7M8 21l4-6 4 6M7 11h10"/></svg>';
 
-// ---- Heart rate zones (same as set_LED_color in the sketch) ----
-function hrMax() { return 220 - state.age; }
-function zoneOf(bpm) {
-  const m = hrMax();
-  if (bpm < 40) return null;
-  if (bpm < m * 0.4) return { name: 'Light', color: 'var(--zone-low)' };
-  if (bpm <= m * 0.6) return { name: 'Moderate', color: 'var(--zone-mid)' };
-  return { name: 'Hard', color: 'var(--zone-high)' };
+function zone(p) {
+  const max = 220 - p.age;
+  if (p.bpm < 40) return null;                 // still measuring / no finger
+  if (p.bpm < max * ZONE_MID) return 'low';
+  if (p.bpm <= max * ZONE_HIGH) return 'mid';
+  return 'high';
 }
-function renderZoneLabels() {
-  const m = hrMax();
-  $('z40').textContent = Math.round(m * 0.4);
-  $('z60').textContent = Math.round(m * 0.6);
-  $('zMax').textContent = `${m} max`;
+
+function buildExerciseButtons() {
+  const seg = $('exerciseSeg');
+  seg.innerHTML = EXERCISES.map((e, i) => `<button data-i="${i}" aria-pressed="${i === Patients.exercise}">${e}</button>`).join('');
+  seg.onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const i = +b.dataset.i; if (i === Patients.exercise) return;
+    Patients.list.forEach(p => Patients.closeSet(p));
+    Patients.exercise = i; store.set('exercise', i);
+    seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', +x.dataset.i === i));
+    Patients.onExerciseChange(i);
+    toast(`Everyone switched to ${EXERCISES[i]}`);
+    render();
+  };
 }
-$('age').value = state.age;
-$('age').oninput = e => {
-  const v = parseInt(e.target.value, 10);
-  if (v >= 5 && v <= 100) { state.age = v; store.set('age', v); renderZoneLabels(); }
-};
-function renderHR() {
-  const z = zoneOf(state.bpm);
-  const tag = $('zoneTag'), marker = $('zoneMarker');
-  if (z) {
-    $('bpmNum').textContent = Math.round(state.bpm);
-    tag.textContent = `${z.name} zone`; tag.style.background = z.color;
-    marker.style.display = 'block';
-    marker.style.left = `calc(${Math.min(100, state.bpm / hrMax() * 100)}% - 1px)`;
-  } else {
-    $('bpmNum').textContent = '--';
-    marker.style.display = 'none';
-    tag.style.background = 'var(--zone-off)';
-    tag.textContent = 'Place finger on sensor (10 s to measure)';
+
+function buildUnitToggle() {
+  const seg = $('unitSeg');
+  const sync = () => {
+    seg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.u === Patients.unit));
+    document.querySelectorAll('.uName').forEach(s => s.textContent = Patients.unit);
+  };
+  seg.onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    Patients.unit = b.dataset.u; store.set('unit', Patients.unit); sync(); render();
+  };
+  sync();
+}
+
+function buildTiles() {
+  if (!Patients.list.length) {
+    $('grid').innerHTML = '<p class="empty">Waiting for devices. Turn on the ESP32s and make sure they are on the same WiFi as this laptop.</p>';
+    return;
   }
+  $('grid').innerHTML = Patients.list.map(p => `
+    <article class="tile" id="t-${p.id}">
+      <div class="top"><div class="who"><span class="name"></span><span class="ex"></span></div>
+        <button class="edit" data-id="${p.id}" aria-label="Edit patient" title="Edit name, age and weights">${PENCIL}</button></div>
+      <div class="hr"><span class="heart">♥</span><b>--</b><span>bpm</span></div>
+      <div class="meter"><i></i></div>
+      <div class="foot"><span class="reps"><b>0</b> <span class="rl">reps</span></span><span class="status"></span><span class="weight"></span></div>
+    </article>`).join('');
+  $('grid').onclick = e => { const b = e.target.closest('.edit'); if (b) openEdit(b.dataset.id); };
 }
 
-// ---- Exercise controls ----
-document.querySelectorAll('.seg button').forEach(b => b.onclick = () => {
-  const m = +b.dataset.mode;
-  if (m === state.mode) return;
-  if (state.reps > 0) finishSet();   // log the current set rather than lose it
-  state.mode = m;
-  document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-pressed', x === b));
-  Device.send('M' + m);
-  startNewSet();
-});
-$('btnReset').onclick = () => { Device.send('R'); startNewSet(); };
-$('btnFinish').onclick = () => { if (state.reps > 0) finishSet(); };
+function render() {
+  const now = Date.now(); let high = 0, off = 0;
+  Patients.closeRestedSets(now);
+  for (const p of Patients.list) {
+    const t = $('t-' + p.id);
+    if (!t) continue;
+    const offline = now - p.lastSeen > CONFIG.NO_SIGNAL_MS;
+    const z = offline ? null : zone(p);
+    const setReps = Patients.currentSetReps(p);
+    const w = p.weights[Patients.exercise];
+    const bw = !w || w.v <= 0;
+    t.classList.toggle('offline', offline);
+    t.classList.toggle('high', z === 'high');
+    t.style.setProperty('--zc', z ? `var(--${z})` : 'var(--off)');
+    t.querySelector('.name').textContent = p.name;
+    t.querySelector('.ex').textContent = EXERCISES[Patients.exercise];
+    t.querySelector('.hr b').textContent = z ? Math.round(p.bpm) : '--';
+    t.querySelector('.meter i').style.width = z ? Math.min(100, p.bpm / (220 - p.age) * 100) + '%' : '0';
+    t.querySelector('.reps b').textContent = offline ? '–' : setReps;
+    t.querySelector('.rl').textContent = setReps === 1 && !offline ? 'rep' : 'reps';
+    const wEl = t.querySelector('.weight');
+    wEl.className = 'weight' + (bw ? ' bw' : '');
+    wEl.innerHTML = (bw ? PERSON : DUMBBELL) + `<span>${fmtWeight(w, Patients.unit)}</span>`;
+    t.querySelector('.status').textContent = offline ? 'No signal' : z === 'high' ? 'HR too high' : '';
+    if (offline) off++; else if (z === 'high') high++;
+  }
+  $('sTotal').textContent = Patients.list.length;
+  $('sHigh').textContent = high;
+  $('sOff').textContent = off;
+}
 
-function startNewSet() { state.reps = 0; state.setStart = Date.now(); state.setBpms = []; renderReps(); }
-function finishSet() {
-  const b = state.setBpms;
-  state.log.push({
-    exercise: MODES[state.mode], reps: state.reps, target: state.target,
-    duration: Math.round((Date.now() - state.setStart) / 1000),
-    avgBpm: b.length ? Math.round(b.reduce((a, c) => a + c, 0) / b.length) : null,
-    peakBpm: b.length ? Math.round(Math.max(...b)) : null,
-    finished: new Date().toISOString()
+let editing = null;
+function openEdit(id) {
+  editing = Patients.get(id);
+  $('fName').value = editing.name; $('fAge').value = editing.age;
+  $('fW0').value = fmtNum(Math.max(0, toUnit(editing.weights[0], Patients.unit)));
+  $('fW1').value = fmtNum(Math.max(0, toUnit(editing.weights[1], Patients.unit)));
+  $('editDlg').showModal(); $('fName').select();
+}
+$('fCancel').onclick = () => $('editDlg').close();
+$('editForm').onsubmit = () => {
+  const age = parseInt($('fAge').value, 10), name = $('fName').value.trim();
+  if (!editing || !name || !(age >= 5 && age <= 110)) return;
+  editing.name = name; editing.age = age;
+  [0, 1].forEach(i => {
+    const v = parseFloat($('fW' + i).value);
+    const old = editing.weights[i];
+    // keep the stored value untouched if the field still shows the same rounded number
+    if (v >= 0 && fmtNum(toUnit(old, Patients.unit)) !== fmtNum(v)) editing.weights[i] = { v, u: Patients.unit };
   });
-  store.set('log', state.log);
-  Device.send('R');
-  startNewSet();
-  renderLog();
+  Patients.save(editing); render();
+};
+
+let toastTimer;
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
 }
 
-// ---- Session log ----
-function renderLog() {
-  const body = $('logBody');
-  if (!state.log.length) {
-    body.innerHTML = '<tr><td colspan="8" class="empty">No sets yet. Press “Finish set” to log one.</td></tr>';
-  } else {
-    body.innerHTML = state.log.map((r, i) => `<tr>
-      <td class="num">${i + 1}</td><td>${r.exercise}</td><td class="num">${r.reps}</td><td class="num">${r.target}</td>
-      <td class="num">${fmtTime(r.duration)}</td><td class="num">${r.avgBpm ?? '–'}</td><td class="num">${r.peakBpm ?? '–'}</td>
-      <td>${new Date(r.finished).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</td></tr>`).reverse().join('');
-  }
-  $('sumSets').textContent = state.log.length;
-  $('sumReps').textContent = state.log.reduce((a, r) => a + r.reps, 0) + state.reps;
+/* ---------------------------------------------------------------------
+   Excel export: one box per patient with their stats for this session.
+   Uses the ExcelJS library (website/vendor/exceljs.min.js, works offline).
+   --------------------------------------------------------------------- */
+function sessionSummary(p) {
+  // include the set in progress so nothing is lost if export is pressed mid-set
+  const sets = p.sets.slice();
+  if (p.cur && p.reps - p.cur.startReps > 0) sets.push({ ex: p.cur.ex, reps: p.reps - p.cur.startReps, weight: { ...p.weights[p.cur.ex] } });
+  const byEx = EXERCISES.map((name, i) => {
+    const s = sets.filter(x => x.ex === i);
+    const weights = [...new Set(s.map(x => fmtWeight(x.weight, Patients.unit)))];
+    return {
+      name, sets: s.length, reps: s.reduce((a, x) => a + x.reps, 0),
+      perSet: s.map(x => x.reps).join(', ') || '–',
+      weight: weights.length ? weights.join(' / ') : fmtWeight(p.weights[i], Patients.unit)
+    };
+  });
+  return {
+    name: p.name, age: p.age,
+    avgHr: p.hrN ? Math.round(p.hrSum / p.hrN) : '–',
+    peakHr: p.hrN ? Math.round(p.hrPeak) : '–',
+    redCount: p.redCount, byEx
+  };
 }
-$('btnClear').onclick = () => { state.log = []; store.set('log', []); state.sessionStart = Date.now(); renderLog(); };
-$('btnExport').onclick = () => {
-  const rows = [['set', 'exercise', 'reps', 'target', 'duration_s', 'avg_bpm', 'peak_bpm', 'finished']]
-    .concat(state.log.map((r, i) => [i + 1, r.exercise, r.reps, r.target, r.duration, r.avgBpm ?? '', r.peakBpm ?? '', r.finished]));
-  const blob = new Blob([rows.map(r => r.join(',')).join('\n')], { type: 'text/csv' });
+
+// One box per patient, laid out 3 across, built with the ExcelJS library.
+async function buildWorkbook() {
+  const BOX_W = 5, GAP = 1, PER_ROW = 3, BOX_H = 8;
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Session', {
+    views: [{ showGridLines: false }],
+    pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
+  });
+  const widths = [13, 7, 14, 11, 14];
+  for (let b = 0; b < PER_ROW; b++) {
+    widths.forEach((w, k) => { ws.getColumn(1 + b * (BOX_W + GAP) + k).width = w; });
+    ws.getColumn(1 + b * (BOX_W + GAP) + BOX_W).width = 3;
+  }
+  const thin = { style: 'thin', color: { argb: 'FFB8C2CC' } };
+  const border = { top: thin, left: thin, bottom: thin, right: thin };
+  const fill = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+
+  const d = Patients.sessionStart;
+  ws.getCell(1, 1).value = `Rehab session  ${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  ws.getCell(1, 1).font = { bold: true, size: 16 };
+  ws.getCell(2, 1).value = `Exported ${new Date().toLocaleString()}  ·  weights in ${Patients.unit}`;
+  ws.getCell(2, 1).font = { italic: true, size: 10, color: { argb: 'FF5D6B7A' } };
+
+  Patients.list.forEach((p, i) => {
+    const s = sessionSummary(p);
+    const r0 = 4 + Math.floor(i / PER_ROW) * (BOX_H + GAP);
+    const c0 = 1 + (i % PER_ROW) * (BOX_W + GAP);
+    const cell = (r, c) => ws.getCell(r0 + r, c0 + c);
+    for (let r = 0; r < BOX_H; r++) for (let c = 0; c < BOX_W; c++) cell(r, c).border = border;
+
+    ws.mergeCells(r0, c0, r0, c0 + BOX_W - 1);
+    cell(0, 0).value = s.name;
+    cell(0, 0).font = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } };
+    cell(0, 0).fill = fill('FF2563EB');
+
+    const pair = (r, c, label, value) => {
+      cell(r, c).value = label; cell(r, c).font = { bold: true };
+      cell(r, c + (c ? 2 : 1)).value = value;
+      cell(r, c + (c ? 2 : 1)).alignment = { horizontal: 'left' };
+    };
+    pair(1, 0, 'Age', s.age);
+    ws.mergeCells(r0 + 1, c0 + 2, r0 + 1, c0 + 3); pair(1, 2, 'Red zone alerts', s.redCount);
+    pair(2, 0, 'Avg HR', s.avgHr);
+    ws.mergeCells(r0 + 2, c0 + 2, r0 + 2, c0 + 3); pair(2, 2, 'Peak HR', s.peakHr);
+
+    ['Exercise', 'Sets', 'Reps per set', 'Total reps', 'Weight'].forEach((h, k) => {
+      cell(4, k).value = h; cell(4, k).font = { bold: true }; cell(4, k).fill = fill('FFE0E9FD');
+    });
+    s.byEx.forEach((e, k) => {
+      [e.name, e.sets, e.perSet, e.reps, e.weight].forEach((v, c) => {
+        cell(5 + k, c).value = v;
+        cell(5 + k, c).alignment = { horizontal: 'left' };
+      });
+      cell(5 + k, 0).font = { bold: true };
+    });
+  });
+  return wb.xlsx.writeBuffer();
+}
+
+$('btnExport').onclick = async () => {
+  if (typeof ExcelJS === 'undefined') { toast('Excel library missing (website/vendor/exceljs.min.js)'); return; }
+  const buf = await buildWorkbook();
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const d = Patients.sessionStart, pad = n => String(n).padStart(2, '0');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `pt-session-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  a.download = `rehab-session-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.xlsx`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast('Session exported to Excel');
 };
 
-// ---- Incoming samples ----
-let lastBeat = 0;
-Device.onSample(s => {
-  const now = performance.now();
-  if ('x' in s) { state.motion.push({ t: now, x: s.x, y: s.y, z: s.z }); }
-  if ('bpm' in s) {
-    state.bpm = s.bpm;
-    if (s.bpm >= 40) state.setBpms.push(s.bpm);
-  }
-  if ('reps' in s && s.reps !== state.reps) {
-    const up = s.reps > state.reps;
-    state.reps = s.reps; renderReps(); renderLog();
-    if (up) { const n = $('repNum'); n.classList.remove('bump'); void n.offsetWidth; n.classList.add('bump'); }
-  }
-});
+/* ---------------------------------------------------------------------
+   Live data from server/pt_server.py
+   --------------------------------------------------------------------- */
+const LIVE = location.protocol.startsWith('http') && !new URLSearchParams(location.search).has('demo');
 
-// ---- Charts ----
-function setupCanvas(c) {
-  const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
-  if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
-  const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { ctx, w, h };
-}
-function drawMotion() {
-  const { ctx, w, h } = setupCanvas($('motion'));
-  const now = performance.now(), span = 10000, pad = 30;
-  state.motion = state.motion.filter(p => now - p.t <= span);
-  ctx.clearRect(0, 0, w, h);
-  const yOf = v => h / 2 - (v / 1.5) * (h / 2 - 10);   // ±1.5 g range
-  ctx.font = '11px system-ui'; ctx.fillStyle = css('--muted'); ctx.strokeStyle = css('--line'); ctx.lineWidth = 1;
-  for (const g of [-1, 0, 1]) {
-    ctx.beginPath(); ctx.moveTo(pad, yOf(g)); ctx.lineTo(w, yOf(g)); ctx.stroke();
-    ctx.fillText(`${g > 0 ? '+' : ''}${g}g`, 0, yOf(g) + 4);
+function startLive() {
+  $('demoNote').textContent = 'Connecting to the session server…';
+  Patients.onExerciseChange = mode => {
+    fetch('/api/exercise', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) })
+      .catch(() => toast('Could not reach the server'));
+  };
+  let first = true, failing = false;
+  async function poll() {
+    try {
+      const r = await fetch('/api/state', { cache: 'no-store' });
+      const st = await r.json();
+      if (first && st.mode !== Patients.exercise) {             // follow the server's exercise on load
+        Patients.exercise = st.mode;
+        $('exerciseSeg').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', +x.dataset.i === st.mode));
+      }
+      first = false;
+      let added = false;
+      for (const d of st.devices) {
+        if (!Patients.get(d.id)) { Patients.add(d.id, `Device ${d.id}`, 18); added = true; }
+        Patients.receive(d.id, { bpm: d.bpm, reps: d.reps, seq: d.seq }, Date.now() - d.age_ms);
+      }
+      if (added) buildTiles();
+      const n = st.devices.filter(d => d.age_ms < CONFIG.NO_SIGNAL_MS).length;
+      $('demoNote').textContent = `Live · ${n} of ${st.devices.length} device${st.devices.length === 1 ? '' : 's'} sending data`;
+      if (failing) toast('Reconnected to the server');
+      failing = false;
+    } catch {
+      if (!failing) $('demoNote').textContent = 'Lost connection to the session server. Is pt_server.py still running?';
+      failing = true;
+    }
+    render();
+    setTimeout(poll, 500);
   }
-  const xOf = t => pad + (1 - (now - t) / span) * (w - pad);
-  for (const [k, col] of [['x', '--x'], ['y', '--y'], ['z', '--z']]) {
-    ctx.beginPath(); ctx.strokeStyle = css(col); ctx.lineWidth = 2;
-    state.motion.forEach((p, i) => i ? ctx.lineTo(xOf(p.t), yOf(p[k])) : ctx.moveTo(xOf(p.t), yOf(p[k])));
-    ctx.stroke();
-  }
-  const last = state.motion[state.motion.length - 1];
-  if (last) $('axisReadout').textContent = `X ${last.x.toFixed(2)} · Y ${last.y.toFixed(2)} · Z ${last.z.toFixed(2)}`;
-}
-function drawHrTrend() {
-  const { ctx, w, h } = setupCanvas($('hrTrend'));
-  const now = performance.now(), span = 120000, pad = 30;
-  const pts = state.hrHist = state.hrHist.filter(p => now - p.t <= span);
-  ctx.clearRect(0, 0, w, h);
-  const m = hrMax(), lo = 40, hi = Math.max(m * 0.8, 140);
-  const yOf = v => h - 8 - ((v - lo) / (hi - lo)) * (h - 16);
-  // zone bands
-  const bands = [[lo, m * 0.4, '--zone-low'], [m * 0.4, m * 0.6, '--zone-mid'], [m * 0.6, hi, '--zone-high']];
-  for (const [a, b, c] of bands) {
-    ctx.globalAlpha = 0.08; ctx.fillStyle = css(c);
-    ctx.fillRect(pad, yOf(Math.min(b, hi)), w - pad, yOf(a) - yOf(Math.min(b, hi)));
-  }
-  ctx.globalAlpha = 1; ctx.font = '11px system-ui'; ctx.fillStyle = css('--muted');
-  for (const v of [60, 100, 140].filter(v => v < hi)) ctx.fillText(v, 0, yOf(v) + 4);
-  const xOf = t => pad + (1 - (now - t) / span) * (w - pad);
-  ctx.beginPath(); ctx.strokeStyle = css('--zone-high'); ctx.lineWidth = 2;
-  let pen = false;
-  for (const p of pts) {
-    if (p.v < 40) { pen = false; continue; }
-    pen ? ctx.lineTo(xOf(p.t), yOf(p.v)) : ctx.moveTo(xOf(p.t), yOf(p.v)); pen = true;
-  }
-  ctx.stroke();
-  if (!pts.some(p => p.v >= 40)) {
-    ctx.fillStyle = css('--muted'); ctx.font = '13px system-ui'; ctx.textAlign = 'center';
-    ctx.fillText('Waiting for a heart rate reading', (w + pad) / 2, h / 2); ctx.textAlign = 'start';
-  }
+  poll();
 }
 
-// ---- Connection status ----
-function renderConn() {
-  const live = Device.source && performance.now() - Device.lastSampleAt < 1500;
-  $('connDot').className = 'dot' + (live ? ' live' : '');
-  $('connText').textContent = !Device.source ? 'Not connected'
-    : Device.source === Simulator ? (live ? 'Simulated device' : 'Simulation paused') : (live ? 'Device connected' : 'No data');
+/* ---------------------------------------------------------------------
+   Demo data (used when the page is opened as a file or with ?demo)
+   24 patients sending the same line format as the Arduino. Each does a set
+   of 8-12 reps then rests. One patient's heart rate climbs into the red
+   zone now and then, and one drops out.
+   --------------------------------------------------------------------- */
+function startDemo() {
+const DEMO_NAMES = ['Amira K.', 'Ben T.', 'Carla M.', 'Dev P.', 'Elena R.', 'Farid H.', 'Grace L.', 'Hiro S.',
+  'Isla W.', 'Jonah B.', 'Kavya N.', 'Liam O.', 'Maya C.', 'Noah D.', 'Olivia F.', 'Pedro G.',
+  'Quinn A.', 'Rosa V.', 'Sam J.', 'Tara E.', 'Umar Y.', 'Vera Z.', 'Wes I.', 'Xin Q.'];
+const demo = DEMO_NAMES.map((name, i) => ({
+  id: 'p' + (i + 1), name, age: 20 + ((i * 7) % 45),
+  weights: [{ v: i % 4 === 0 ? 0 : 10 + (i * 5) % 40, u: 'lb' }, { v: i % 6 === 3 ? 0 : 5 + (i * 2.5) % 20, u: 'lb' }],
+  base: 72 + (i * 5) % 30, reps: 0, phase: Math.random(), period: 2.6 + (i % 5) * 0.4,
+  setTarget: 8 + (i % 5), inSet: 0, restLeft: Math.random() * 6
+}));
+demo.forEach(d => Patients.add(d.id, d.name, d.age, d.weights));
+
+const DEMO = { restS: 25 };
+let demoT = 0;
+setInterval(() => {
+  demoT += 0.5;
+  demo.forEach((d, i) => {
+    if (i === 9 && demoT % 40 > 30) return;                      // patient 10 stops sending for 10 s every 40 s
+    if (d.restLeft > 0) d.restLeft -= 0.5;
+    else {
+      d.phase += 0.5 / d.period;
+      if (d.phase >= 1) {
+        d.phase -= 1; d.reps++; d.inSet++;
+        if (d.inSet >= d.setTarget) { d.inSet = 0; d.restLeft = DEMO.restS; }
+      }
+    }
+    let bpm = d.base + Math.min(25, demoT / 8) + Math.sin(demoT / 6 + i) * 4;
+    if (i === 4) bpm += 45 * Math.max(0, Math.sin(demoT / 12));  // patient 5 spikes into the red zone
+    Patients.receive(d.id, { bpm, reps: d.reps });
+  });
+}, 500);
+Patients.onExerciseChange = () => demo.forEach(d => { d.reps = 0; d.inSet = 0; });
 }
 
-// ---- Simulator controls ----
-$('simRun').onclick = () => {
-  if (Simulator.timer) { Simulator.stop(); $('simRun').textContent = 'Resume simulation'; }
-  else { Simulator.timer = setInterval(() => Simulator.tick(), 20); $('simRun').textContent = 'Pause simulation'; }
-};
-$('simFinger').onclick = () => {
-  Simulator.finger = !Simulator.finger;
-  if (Simulator.finger) Simulator.fingerOnAt = Simulator.t;
-  $('simFinger').textContent = Simulator.finger ? 'Remove finger' : 'Place finger';
-};
-$('simRest').onclick = () => {
-  Simulator.resting = !Simulator.resting;
-  $('simRest').textContent = Simulator.resting ? 'Start moving' : 'Rest (stop moving)';
-};
-
-// ---- Main loop ----
-let lastHrPush = 0, lastBpmShown = 0;
-function frame(ts) {
-  drawMotion();
-  if (ts - lastHrPush > 1000) { state.hrHist.push({ t: ts, v: state.bpm }); lastHrPush = ts; drawHrTrend(); }
-  if (ts - lastBpmShown > 500) { renderHR(); renderConn(); lastBpmShown = ts; }
-  // heart pulse animation at the current bpm
-  if (state.bpm >= 40 && ts - lastBeat > 60000 / state.bpm) {
-    lastBeat = ts; const hEl = $('heart'); hEl.classList.remove('beat'); void hEl.offsetWidth; hEl.classList.add('beat');
-  }
-  $('setTimer').textContent = `Set time ${fmtTime((Date.now() - state.setStart) / 1000)}`;
-  $('sumTime').textContent = fmtTime((Date.now() - state.sessionStart) / 1000);
-  requestAnimationFrame(frame);
-}
-
-renderReps(); renderZoneLabels(); renderLog(); drawHrTrend();
-Device.useSource(Simulator);
-requestAnimationFrame(frame);
-window.addEventListener('resize', drawHrTrend);
+/* --------------------------------------------------------------------- */
+if (LIVE) startLive(); else startDemo();
+buildExerciseButtons();
+buildUnitToggle();
+buildTiles();
+render();
+setInterval(render, 500);
 </script>
 </body>
 </html>
