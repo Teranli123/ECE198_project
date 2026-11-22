@@ -44,7 +44,7 @@ long lastBeatTime = 0;
 long lastFingerTime = 0;
 float average = 0;
 
-unsigned int exercise_mode{0}; // 0 for squats,
+unsigned int exercise_mode{0}; // 0 for squats, 1 for bicep curls
 
 // Squat rep counter. Tune the thresholds from the Serial Plotter:
 // standing should sit below SQUAT_LOWER, the bottom of a squat above SQUAT_UPPER.
@@ -53,6 +53,29 @@ const float SQUAT_LOWER = 0.35;   // g, signal falls below this = back standing
 const long MIN_REP_MS = 800;      // ignore "reps" faster than this (bumps, jitter)
 bool squatDown = false;
 long lastRepTime = 0;
+
+// Bicep curl rep counter.
+// Sensor on the forearm. With the arm hanging, gravity points along -x.
+// Curling the forearm up rotates gravity toward +x. We track the angle between
+// the gravity vector and the -x axis: about 0 deg at the bottom, about 140-180 deg
+// at the top. Using the angle (not raw x) means the y/z tilt of the strap and the
+// exact g scaling don't matter. Tune the two angles from the CurlAngle plot.
+const int   CURL_AXIS = 0;          // 0 = x, 1 = y, 2 = z: axis gravity runs along at the bottom
+const float CURL_SIGN = -1.0;       // -1 = gravity points along the NEGATIVE axis at the bottom
+const float CURL_TOP_DEG = 120.0;   // angle above this = at the top of the curl
+const float CURL_BOTTOM_DEG = 45.0; // angle below this = back at the bottom
+const float CURL_MIN_G = 0.5;       // ignore samples while shaking (|a| too small to trust)
+bool curlUp = false;
+float curlAngle = 0;
+
+// Angle in degrees between the measured gravity vector and the "bottom" direction
+float gravityAngleFromStart(float ax, float ay, float az) {
+  float mag = sqrt(ax * ax + ay * ay + az * az);
+  if (mag < CURL_MIN_G) return -1;  // not trustworthy, caller keeps the old angle
+  float a = (CURL_AXIS == 0) ? ax : (CURL_AXIS == 1) ? ay : az;
+  float c = constrain(CURL_SIGN * a / mag, -1.0, 1.0);
+  return acos(c) * 180.0 / PI;
+}
 
 // Start everything over (finger removed)
 void resetAll() {
@@ -221,7 +244,17 @@ void loop() {
     }
   }
   else if(exercise_mode == 1){
-    //code for rep counter of other exercises
+    float ang = gravityAngleFromStart(emaX, emaY, emaZ);
+    if (ang >= 0) curlAngle = ang;
+
+    bool wasUp = curlUp;
+    curlUp = hysteresis(curlUp, curlAngle, CURL_TOP_DEG, CURL_BOTTOM_DEG);
+
+    // bottom -> top -> back to bottom is one full rep
+    if(wasUp && !curlUp && now - lastRepTime > MIN_REP_MS){
+      rep_count++;
+      lastRepTime = now;
+    }
   }
 
   // ---------- LED ----------
@@ -236,6 +269,10 @@ void loop() {
   Serial.print(emaZ, 3);
   Serial.print(",BPM_div_100:");
   Serial.print(average / 100, 3);
+  if (exercise_mode == 1) {
+    Serial.print(",CurlAngle_div_100:");
+    Serial.print(curlAngle / 100, 3);
+  }
   Serial.print(",Reps:");
   Serial.println(rep_count);
 }
