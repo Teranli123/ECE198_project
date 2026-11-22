@@ -22,10 +22,10 @@ data stays on the laptop.
 
 ## 2. Start the server on the laptop
 
-Needs Python 3.8 or newer and Flask (install it once):
+Needs Python 3.8 or newer, Flask and zeroconf (install them once):
 
 ```
-pip install flask
+pip install flask zeroconf
 cd ECE198_project
 python server/pt_server.py
 ```
@@ -35,7 +35,7 @@ It prints something like:
 ```
 PT Aid server running.
   Dashboard:  http://localhost:8000
-  Put this in the ESP32's wifi_config.h as PT_SERVER_HOST:  172.20.10.2
+  Laptop address: 172.20.10.2 (ESP32s find this automatically)
 ```
 
 Open **http://localhost:8000** in a browser on the laptop. It says "Waiting for
@@ -46,15 +46,22 @@ The first time, Windows may ask whether Python can use the network. Allow it on
 Cancel, use *Windows Security → Firewall → Allow an app through firewall* and
 tick Python for Private.
 
-## 3. Point the ESP32 at the laptop
+## 3. Set up the ESP32 (once)
 
 1. Copy `esp32_pt_aid/src/wifi_config.example.h` to `esp32_pt_aid/src/wifi_config.h`.
-2. Fill in the hotspot name, password, and the address the server printed.
+2. Fill in the hotspot name and password exactly as the phone shows them.
    (`wifi_config.h` is ignored by git, so the password doesn't end up on GitHub.)
 3. Upload with PlatformIO (`pio run -t upload`).
-4. In the serial monitor you should see
-   `WiFi connected as device A1B2C3, IP ..., sending to http://172.20.10.2:8000/api/data`.
-   The server prints `+ device A1B2C3 connected` and a tile appears on the dashboard.
+
+You don't need the laptop's address. The server announces itself on the WiFi
+(mDNS, service `_ptaid._tcp`), and each ESP32 looks it up on its own. If the
+laptop gets a new address, the server re-announces it and the ESP32s follow
+within a few seconds, with no reflashing. `PT_SERVER_HOST` in `wifi_config.h` is only a
+fallback for when the lookup fails.
+
+In the serial monitor you should see
+`WiFi connected as device A1B2C3 ...` and then `Found PT Aid server at 172.20.10.x:8000`.
+The server prints `+ device A1B2C3 connected` and a tile appears on the dashboard.
 
 The 6-character device ID comes from the board's chip, so it stays the same
 every time. Click the pencil on the tile to give it the patient's name, age and
@@ -65,8 +72,8 @@ weights. These are saved in that browser and keyed to the device ID.
 | What you see | Likely cause |
 |---|---|
 | ESP32 never prints "WiFi connected" | Wrong hotspot name or password, or the hotspot is 5 GHz only |
-| ESP32 connects but no tile appears | Wrong `PT_SERVER_HOST`, or Windows Firewall is blocking Python |
-| The laptop's address changed | Hotspots can hand out a new address after reconnecting. Re-check what the server prints and update `wifi_config.h` |
+| ESP32 says "Server not found on the network yet" | pt_server.py isn't running, zeroconf isn't installed, or Windows Firewall is blocking Python |
+| ESP32 found the server but no tile appears | Windows Firewall is blocking Python on this network (allow it for Public and Private) |
 | Tile is greyed out with "No signal" | That ESP32 hasn't sent anything for 3 seconds (out of range, unplugged, or rebooting) |
 
 ## Excel export

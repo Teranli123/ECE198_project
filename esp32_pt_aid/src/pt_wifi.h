@@ -11,23 +11,33 @@
 //   loop():   ptWifiPublish(average, rep_count, exercise_mode);
 //             int m; if (ptWifiTakeMode(m)) { exercise_mode = m; rep_count = 0; ... }
 //
-// WiFi name, password and the laptop's address live in wifi_config.h
+// Finding the laptop: the server announces itself on the WiFi with mDNS
+// (service "_ptaid._tcp", the same thing printers use). The ESP32 looks it up
+// with the built-in ESPmDNS library, so the laptop's address can change
+// without reflashing. If the lookup fails, it falls back to PT_SERVER_HOST.
+//
+// WiFi name and password live in wifi_config.h
 // (copy wifi_config.example.h to wifi_config.h and fill it in).
 
 #pragma once
 #include <Arduino.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <ESPmDNS.h>
 
 #if __has_include("wifi_config.h")
 #include "wifi_config.h"
 #else
-#error "Copy src/wifi_config.example.h to src/wifi_config.h and fill in your hotspot and laptop address."
+#error "Copy src/wifi_config.example.h to src/wifi_config.h and fill in your hotspot name and password."
 #endif
 
+#ifndef PT_SERVER_HOST
+#define PT_SERVER_HOST ""       // optional fallback; discovery normally finds the laptop
+#endif
 #ifndef PT_SERVER_PORT
 #define PT_SERVER_PORT 8000
 #endif
+#define PT_REDISCOVER_AFTER 6   // failed sends in a row (~3 s) before looking for the server again
 #ifndef PT_SEND_MS
 #define PT_SEND_MS 500        // send twice a second
 #endif
@@ -40,14 +50,35 @@ namespace ptwifi {
   int pendingMode = -1;       // set by the WiFi task when the server wants a different exercise
   char deviceId[7] = "000000";
 
+  // Look for the laptop server on the network. Fills host/port; false if not found.
+  bool discover(String &host, uint16_t &port) {
+    int n = MDNS.queryService("ptaid", "tcp");   // blocks up to ~3 s; fine, this is the WiFi task
+    if (n > 0) {
+      host = MDNS.IP(0).toString();
+      port = MDNS.port(0);
+      Serial.printf("Found PT Aid server at %s:%u\n", host.c_str(), port);
+      return true;
+    }
+    if (strlen(PT_SERVER_HOST) > 0) {
+      host = PT_SERVER_HOST;
+      port = PT_SERVER_PORT;
+      Serial.printf("Server not found on the network; trying %s:%u from wifi_config.h\n", host.c_str(), port);
+      return true;
+    }
+    Serial.println("Server not found on the network yet. Is pt_server.py running?");
+    return false;
+  }
+
   void task(void *) {
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
     WiFi.begin(PT_WIFI_SSID, PT_WIFI_PASSWORD);
 
+    String host;
+    uint16_t port = PT_SERVER_PORT;
+    bool announced = false, haveServer = false;
+    int failures = 0;
     char url[64];
-    snprintf(url, sizeof(url), "http://%s:%d/api/data", PT_SERVER_HOST, PT_SERVER_PORT);
-    bool announced = false;
 
     for (;;) {
       if (WiFi.status() != WL_CONNECTED) {
@@ -56,9 +87,17 @@ namespace ptwifi {
         continue;
       }
       if (!announced) {
-        Serial.printf("WiFi connected as device %s, IP %s, sending to %s\n",
-                      deviceId, WiFi.localIP().toString().c_str(), url);
+        Serial.printf("WiFi connected as device %s, IP %s\n", deviceId, WiFi.localIP().toString().c_str());
+        MDNS.end();
+        MDNS.begin((String("ptaid-") + deviceId).c_str());
         announced = true;
+        haveServer = false;
+      }
+      if (!haveServer || failures >= PT_REDISCOVER_AFTER) {
+        failures = 0;
+        haveServer = discover(host, port);
+        if (!haveServer) { vTaskDelay(pdMS_TO_TICKS(1000)); continue; }
+        snprintf(url, sizeof(url), "http://%s:%u/api/data", host.c_str(), port);
       }
 
       float b; int r, m;
@@ -76,6 +115,7 @@ namespace ptwifi {
       if (http.begin(url)) {
         http.addHeader("Content-Type", "application/json");
         int code = http.POST((uint8_t *)body, len);
+        failures = (code == 200) ? 0 : failures + 1;
         if (code == 200) {
           String reply = http.getString();          // {"mode": 1}
           int i = reply.indexOf("\"mode\"");
@@ -90,6 +130,8 @@ namespace ptwifi {
           }
         }
         http.end();
+      } else {
+        failures++;
       }
       vTaskDelay(pdMS_TO_TICKS(PT_SEND_MS));
     }

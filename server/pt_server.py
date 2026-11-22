@@ -4,11 +4,14 @@
 Runs on the instructor's laptop. Every ESP32 posts its heart rate and reps here,
 and the dashboard (website/index.html) is served from here and shows them live.
 
-Setup (once):  pip install flask
+Setup (once):  pip install flask zeroconf
 Run:           python server/pt_server.py
 Then open:     http://localhost:8000  on the laptop
 
 The laptop and the ESP32s must be on the same WiFi (the phone hotspot).
+The server announces itself on the WiFi with mDNS (service "_ptaid._tcp",
+using the zeroconf library), so the ESP32s find the laptop on their own even
+when its address changes.
 
 API
   POST /api/data      from an ESP32, JSON: {"id": "A1B2C3", "bpm": 72.4, "reps": 5, "mode": 0}
@@ -25,6 +28,11 @@ import threading
 import time
 
 from flask import Flask, jsonify, request, send_from_directory
+
+try:
+    from zeroconf import IPVersion, ServiceInfo, Zeroconf
+except ImportError:          # server still works; ESP32s then need PT_SERVER_HOST
+    Zeroconf = None
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WEBSITE_DIR = os.path.normpath(os.path.join(HERE, "..", "website"))
@@ -102,6 +110,35 @@ def local_ip():
         return None
 
 
+def advertise(port):
+    """Announce this server on the WiFi so ESP32s can find it (mDNS / zeroconf).
+    Re-announces with the new address whenever the laptop's address changes."""
+    if Zeroconf is None:
+        print("  ! zeroconf not installed (pip install zeroconf). ESP32s can't find the laptop automatically.")
+        return
+    zc = Zeroconf(ip_version=IPVersion.V4Only)
+    name = f"PT Aid server {socket.gethostname()}._ptaid._tcp.local."
+    current = None
+    info = None
+    while True:
+        ip = local_ip()
+        if ip and ip != current:
+            new_info = ServiceInfo("_ptaid._tcp.local.", name, port=port,
+                                   addresses=[socket.inet_aton(ip)], properties={"path": "/api/data"})
+            try:
+                if info is None:
+                    zc.register_service(new_info, allow_name_change=True)
+                else:
+                    zc.update_service(new_info)
+                info = new_info
+                if current:
+                    print(f"  laptop address changed {current} -> {ip}; ESP32s will follow automatically")
+                current = ip
+            except Exception as e:   # keep the web server running even if mDNS has trouble
+                print(f"  ! could not announce on the network: {e}")
+        time.sleep(5)
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="PT Aid session server")
     ap.add_argument("--port", type=int, default=8000)
@@ -112,6 +149,7 @@ if __name__ == "__main__":
     print(f"  Dashboard:  http://localhost:{args.port}")
     ip = local_ip()
     if ip:
-        print(f"  Put this in the ESP32's wifi_config.h as PT_SERVER_HOST:  {ip}")
+        print(f"  Laptop address: {ip} (ESP32s find this automatically)")
     print("  Press Ctrl+C to stop.\n")
+    threading.Thread(target=advertise, args=(args.port,), daemon=True).start()
     app.run(host="0.0.0.0", port=args.port, threaded=True)

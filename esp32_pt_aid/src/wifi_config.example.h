@@ -5,5 +5,7 @@
 
 #define PT_WIFI_SSID     "MyPhoneHotspot"   // hotspot name (2.4 GHz; on iPhone turn on "Maximize Compatibility")
 #define PT_WIFI_PASSWORD "hotspot-password"
-#define PT_SERVER_HOST   "172.20.10.2"      // laptop's address, printed when you start server/pt_server.py
+// Optional: the ESP32 finds the laptop by itself. This address is only a fallback
+// if that fails. Leave it as "" or put the address pt_server.py prints.
+#define PT_SERVER_HOST   ""
 #define PT_SERVER_PORT   8000
