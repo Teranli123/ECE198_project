@@ -16,6 +16,16 @@
 #include "heartRate.h"
 #include "pt_wifi.h"
 
+// TEMPORARY TEST (Nov 22): turn off the ESP32's brownout detector to check whether
+// the resets are a borderline power dip or a damaged board. Set to 0 (or delete
+// this block and the two lines in setup) once the test is done: with it off, a real
+// power problem can cause random crashes instead of a clean reset.
+//#define PT_DISABLE_BROWNOUT 0
+//#if PT_DISABLE_BROWNOUT
+//#include "soc/soc.h"
+//#include "soc/rtc_cntl_reg.h"
+//#endif
+
 // ---------- Pins (ESP32 DevKit V1) ----------
 // Accelerometer: ADC1 only (works with WiFi on). 34-39 are input-only, fine for analog.
 const uint8_t PX = 36, PY = 39, PZ = 34;   // ADC1_CH0 (VP), ADC1_CH3 (VN), ADC1_CH6; were A0, A1, A2
@@ -46,8 +56,8 @@ bool firstRead = true;
 MAX30105 sensor;
 
 // ---------- Multicolor LED ----------
-int age = 18;
-const int heart_rate_max = (220 - age);
+int age = 18;                       // until the dashboard sends this patient's age
+int heart_rate_max = (220 - age);
 
 const int FINGER_LIMIT = 10000;   // IR below this = no finger
 const int GRACE = 1500;           // ms of lost contact we tolerate
@@ -170,6 +180,9 @@ bool hysteresis(bool state, float reading, float uthreshold, float lthreshold){
 }
 
 void setup() {
+#if PT_DISABLE_BROWNOUT
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);   // temporary: brownout detector off
+#endif
   Serial.begin(115200);
   delay(500);   // ESP32 Serial is a hardware UART; give the monitor a moment after reset
 
@@ -180,6 +193,10 @@ void setup() {
   // 11 dB attenuation = roughly 0-3.1 V input range (the default, set explicitly)
   analogReadResolution(12);
   analogSetAttenuation(ADC_11db);
+
+  // Start WiFi first: it runs in its own task, so the dashboard link works even
+  // if the heart rate sensor check below fails (handy for testing the board alone).
+  ptWifiBegin();
 
   Wire.begin(SDA_PIN, SCL_PIN);
   if (!sensor.begin(Wire, I2C_SPEED_FAST)) {
@@ -192,7 +209,6 @@ void setup() {
 
   lastFingerTime = -(GRACE + 1);   // start in the "no finger" state
 
-  ptWifiBegin();
 }
 
 void loop() {
@@ -298,6 +314,11 @@ void loop() {
     rep_count = 0;
     squatDown = false;
     curlUp = false;
+  }
+  int newAge;
+  if (ptWifiTakeAge(newAge)) {     // instructor set this patient's age on the dashboard
+    age = newAge;
+    heart_rate_max = 220 - age;
   }
 
   // ---------- LED ----------

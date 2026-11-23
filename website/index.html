@@ -476,6 +476,7 @@ function startLive() {
       .catch(() => toast('Could not reach the server'));
   };
   let first = true, failing = false;
+  const sendingAge = new Set();
   async function poll() {
     try {
       const r = await fetch('/api/state', { cache: 'no-store' });
@@ -489,6 +490,12 @@ function startLive() {
       for (const d of st.devices) {
         if (!Patients.get(d.id)) { Patients.add(d.id, `Device ${d.id}`, 18); added = true; }
         Patients.receive(d.id, { bpm: d.bpm, reps: d.reps, seq: d.seq }, Date.now() - d.age_ms);
+        const p = Patients.get(d.id);                             // give the device this patient's age (LED colours)
+        if (d.age !== p.age && !sendingAge.has(d.id)) {
+          sendingAge.add(d.id);
+          fetch('/api/age', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: d.id, age: p.age }) })
+            .catch(() => {}).finally(() => sendingAge.delete(d.id));
+        }
       }
       if (added) buildTiles();
       const n = st.devices.filter(d => d.age_ms < CONFIG.NO_SIGNAL_MS).length;

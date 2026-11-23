@@ -15,9 +15,11 @@ when its address changes.
 
 API
   POST /api/data      from an ESP32, JSON: {"id": "A1B2C3", "bpm": 72.4, "reps": 5, "mode": 0}
-                      reply JSON: {"mode": 0}   (the exercise every device should be on)
+                      reply JSON: {"mode": 0, "age": 45}   (the exercise every device should be on,
+                      and this patient's age if the dashboard has set it)
   GET  /api/state     for the dashboard: all devices and the current exercise
   POST /api/exercise  from the dashboard, JSON: {"mode": 1}
+  POST /api/age       from the dashboard, JSON: {"id": "A1B2C3", "age": 45}
 """
 
 import argparse
@@ -42,6 +44,7 @@ app = Flask(__name__, static_folder=WEBSITE_DIR, static_url_path="")
 lock = threading.Lock()
 devices = {}            # id -> {"bpm", "reps", "mode", "seq", "last_seen", "ip"}
 state = {"mode": 0}     # exercise chosen on the dashboard, sent to every device
+ages = {}               # id -> patient age set on the dashboard, sent to that device
 
 
 @app.get("/")
@@ -67,9 +70,12 @@ def device_data():
         devices[dev_id] = {"bpm": bpm, "reps": reps, "mode": mode, "seq": seq,
                            "last_seen": time.time(), "ip": request.remote_addr}
         want = state["mode"]
+        age = ages.get(dev_id)
     if new:
         print(f"  + device {dev_id} connected from {request.remote_addr}")
-    return jsonify(mode=want)
+    if age is None:
+        return jsonify(mode=want)
+    return jsonify(mode=want, age=age)
 
 
 @app.get("/api/state")
@@ -77,7 +83,7 @@ def session_state():
     now = time.time()
     with lock:
         out = [{"id": k, "bpm": v["bpm"], "reps": v["reps"], "mode": v["mode"], "seq": v["seq"],
-                "age_ms": int((now - v["last_seen"]) * 1000)}
+                "age_ms": int((now - v["last_seen"]) * 1000), "age": ages.get(k)}
                for k, v in devices.items()]
         mode = state["mode"]
     return jsonify(mode=mode, devices=out)
@@ -98,6 +104,24 @@ def set_exercise():
     return jsonify(mode=mode)
 
 
+@app.post("/api/age")
+def set_age():
+    data = request.get_json(silent=True) or {}
+    dev_id = str(data.get("id", ""))[:32]
+    try:
+        age = int(data.get("age"))
+    except (TypeError, ValueError):
+        return jsonify(error="bad age"), 400
+    if not dev_id or not 5 <= age <= 110:
+        return jsonify(error="bad id or age"), 400
+    with lock:
+        changed = ages.get(dev_id) != age
+        ages[dev_id] = age
+    if changed:
+        print(f"  device {dev_id}: age {age}")
+    return jsonify(id=dev_id, age=age)
+
+
 def local_ip():
     """The laptop's address on the WiFi, for the ESP32's wifi_config.h."""
     try:
@@ -116,27 +140,32 @@ def advertise(port):
     if Zeroconf is None:
         print("  ! zeroconf not installed (pip install zeroconf). ESP32s can't find the laptop automatically.")
         return
-    zc = Zeroconf(ip_version=IPVersion.V4Only)
     name = f"PT Aid server {socket.gethostname()}._ptaid._tcp.local."
     current = None
-    info = None
+    zc = None
     while True:
         ip = local_ip()
         if ip and ip != current:
-            new_info = ServiceInfo("_ptaid._tcp.local.", name, port=port,
-                                   addresses=[socket.inet_aton(ip)], properties={"path": "/api/data"})
+            # A new address usually means a new WiFi network. Start a fresh announcer
+            # bound to that network, because one created earlier keeps talking on the
+            # old network only.
             try:
-                if info is None:
-                    zc.register_service(new_info, allow_name_change=True)
-                else:
-                    zc.update_service(new_info)
-                info = new_info
+                if zc is not None:
+                    zc.unregister_all_services()
+                    zc.close()
+                zc = Zeroconf(interfaces=[ip], ip_version=IPVersion.V4Only)
+                info = ServiceInfo("_ptaid._tcp.local.", name, port=port,
+                                   addresses=[socket.inet_aton(ip)], properties={"path": "/api/data"})
+                zc.register_service(info, allow_name_change=True)
                 if current:
                     print(f"  laptop address changed {current} -> {ip}; ESP32s will follow automatically")
+                else:
+                    print(f"  announcing on the network as {ip}:{port}")
                 current = ip
             except Exception as e:   # keep the web server running even if mDNS has trouble
-                print(f"  ! could not announce on the network: {e}")
-        time.sleep(5)
+                print(f"  ! could not announce on the network ({ip}): {e}")
+                zc = None
+        time.sleep(3)
 
 
 if __name__ == "__main__":
