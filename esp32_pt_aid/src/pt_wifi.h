@@ -40,7 +40,7 @@
 #endif
 #define PT_REDISCOVER_AFTER 6   // failed sends in a row (~3 s) before looking for the server again
 #ifndef PT_WIFI_TX_POWER
-#define PT_WIFI_TX_POWER WIFI_POWER_8_5dBm   // default is 19.5 dBm
+#define PT_WIFI_TX_POWER WIFI_POWER_19_5dBm  // full power; lower it (e.g. WIFI_POWER_8_5dBm) only if you see brownout resets
 #endif
 #ifndef PT_SEND_MS
 #define PT_SEND_MS 500        // send twice a second
@@ -104,8 +104,8 @@ namespace ptwifi {
     WiFi.setAutoReconnect(true);
     Serial.printf("WiFi: joining \"%s\"\n", PT_WIFI_SSID);
     WiFi.begin(PT_WIFI_SSID, PT_WIFI_PASSWORD);
-    // Lower transmit power cuts the current spikes that trigger brownout resets on
-    // weak USB power. Plenty for a hotspot in the same room; raise it if range is poor.
+    // Transmit power: full by default. If the board brownout-resets on weak USB
+    // power, set PT_WIFI_TX_POWER lower in wifi_config.h.
     WiFi.setTxPower(PT_WIFI_TX_POWER);
     uint32_t lastReport = millis();
 
